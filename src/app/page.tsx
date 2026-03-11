@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Unit {
   id: string;
@@ -98,6 +99,14 @@ export default function Dashboard() {
   const totalTrackers = units.length;
   const totalOpens = units.reduce((acc, u) => acc + u.total_opens, 0);
 
+  const router = useRouter();
+  
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.push('/login');
+    router.refresh();
+  };
+
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-50 p-4 md:p-8 font-sans">
       <div className="max-w-6xl mx-auto">
@@ -109,12 +118,20 @@ export default function Dashboard() {
             </h1>
             <p className="text-slate-400 text-sm mt-1">Hệ thống phân tích lượt xem Google Slides chuyên nghiệp</p>
           </div>
-          <button 
-            onClick={() => setModalOpen('create')}
-            className="bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all text-white px-6 py-2.5 rounded-lg font-semibold shadow-lg shadow-indigo-500/20"
-          >
-            + Tạo Tracker mới
-          </button>
+          <div className="flex gap-3">
+            <button 
+              onClick={handleLogout}
+              className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2.5 rounded-lg font-medium transition-all text-sm border border-slate-700"
+            >
+              Đăng xuất
+            </button>
+            <button 
+              onClick={() => setModalOpen('create')}
+              className="bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all text-white px-6 py-2.5 rounded-lg font-semibold shadow-lg shadow-indigo-500/20"
+            >
+              + Tạo Tracker
+            </button>
+          </div>
         </header>
 
         {/* Stats Grid */}
