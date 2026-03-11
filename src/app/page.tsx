@@ -21,10 +21,12 @@ interface Log {
 export default function Dashboard() {
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState<'create' | 'logs' | null>(null);
+  const [modalOpen, setModalOpen] = useState<'create' | 'logs' | 'links' | 'edit' | 'delete' | null>(null);
   const [activeUnit, setActiveUnit] = useState<{ id: string, name: string } | null>(null);
   const [logs, setLogs] = useState<Log[]>([]);
   const [newName, setNewName] = useState('');
+  const [newUrl, setNewUrl] = useState('');
+  const [editName, setEditName] = useState('');
   const [toast, setToast] = useState<string | null>(null);
 
   const [errorObj, setErrorObj] = useState<{message: string, url?: string} | null>(null);
@@ -70,12 +72,14 @@ export default function Dashboard() {
 
   const createUnit = async () => {
     if (!newName) return showToast('Vui lòng nhập tên slide');
+    if (!newUrl) return showToast('Vui lòng nhập Link Gốc');
     await fetch('/api/units', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName })
+      body: JSON.stringify({ name: newName, url: newUrl })
     });
     setNewName('');
+    setNewUrl('');
     setModalOpen(null);
     fetchStats();
     showToast('Đã tạo tracker thành công!');
@@ -90,10 +94,65 @@ export default function Dashboard() {
     setLogs(data);
   };
 
-  const copyPixel = (id: string) => {
-    const url = `${window.location.origin}/api/t/${id}`;
+  const [links, setLinks] = useState<any[]>([]);
+  const [newEmail, setNewEmail] = useState('');
+
+  const openLinks = async (id: string, name: string) => {
+    setActiveUnit({ id, name });
+    setModalOpen('links');
+    setLinks([]);
+    const res = await fetch(`/api/links?unit_id=${id}`);
+    const data = await res.json();
+    if (Array.isArray(data)) setLinks(data);
+  };
+
+  const createLink = async () => {
+    if (!newEmail || !activeUnit) return showToast('Vui lòng nhập Email');
+    await fetch('/api/links', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unit_id: activeUnit.id, email: newEmail })
+    });
+    setNewEmail('');
+    openLinks(activeUnit.id, activeUnit.name); // refresh
+    showToast('Đã tạo link thành công!');
+  };
+
+  const copyLink = (shortId: string) => {
+    const url = `${window.location.origin}/${shortId}`;
     navigator.clipboard.writeText(url);
-    showToast('Đã copy Link Pixel!');
+    showToast('Đã copy Link Tracking!');
+  };
+
+  const openEdit = (id: string, name: string) => {
+    setActiveUnit({ id, name });
+    setEditName(name);
+    setModalOpen('edit');
+  };
+
+  const updateUnit = async () => {
+    if (!editName || !activeUnit) return showToast('Vui lòng nhập tên mới');
+    await fetch(`/api/units/${activeUnit.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: editName })
+    });
+    setModalOpen(null);
+    fetchStats();
+    showToast('Đã cập nhật tên thành công!');
+  };
+
+  const openDelete = (id: string, name: string) => {
+    setActiveUnit({ id, name });
+    setModalOpen('delete');
+  };
+
+  const deleteUnit = async () => {
+    if (!activeUnit) return;
+    await fetch(`/api/units/${activeUnit.id}`, { method: 'DELETE' });
+    setModalOpen(null);
+    fetchStats();
+    showToast('Đã xóa tracker thành công!');
   };
 
   const totalTrackers = units.length;
@@ -170,18 +229,30 @@ export default function Dashboard() {
                     <td className="px-6 py-4 text-slate-400 text-sm">
                       {u.last_open ? new Date(u.last_open).toLocaleString('vi-VN') : '—'}
                     </td>
-                    <td className="px-6 py-4 text-right space-x-2">
+                    <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
                        <button 
-                        onClick={() => copyPixel(u.id)}
+                        onClick={() => openLinks(u.id, u.name)}
                         className="bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
                       >
-                        Copy Link
+                        Tạo Link Xem
                       </button>
                       <button 
                         onClick={() => openLogs(u.id, u.name)}
                         className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
                       >
                         Nhật ký
+                      </button>
+                      <button 
+                        onClick={() => openEdit(u.id, u.name)}
+                        className="bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
+                      >
+                        Sửa
+                      </button>
+                      <button 
+                        onClick={() => openDelete(u.id, u.name)}
+                        className="bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 border border-rose-500/20 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
+                      >
+                        Xóa
                       </button>
                     </td>
                   </tr>
@@ -236,6 +307,16 @@ export default function Dashboard() {
                   className="w-full bg-[#0f172a] border border-slate-700 rounded-xl px-4 py-3 outline-none focus:border-indigo-500 transition-colors"
                 />
               </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1.5">Link Google Slides Gốc</label>
+                <input 
+                  type="url" 
+                  value={newUrl}
+                  onChange={(e) => setNewUrl(e.target.value)}
+                  placeholder="https://docs.google.com/presentation/d/..." 
+                  className="w-full bg-[#0f172a] border border-slate-700 rounded-xl px-4 py-3 outline-none focus:border-indigo-500 transition-colors"
+                />
+              </div>
               <div className="flex gap-3 pt-4">
                 <button 
                   onClick={() => setModalOpen(null)}
@@ -250,6 +331,72 @@ export default function Dashboard() {
                   Tạo ngay
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Links Modal */}
+      {modalOpen === 'links' && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-[#1e293b] border border-slate-700 w-full max-w-2xl max-h-[85vh] p-8 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-slate-100">
+                Quản lý Link: <span className="text-indigo-400">{activeUnit?.name}</span>
+              </h2>
+              <button onClick={() => setModalOpen(null)} className="text-slate-400 hover:text-white p-2">✕</button>
+            </div>
+            
+            <div className="flex gap-2 mb-6">
+              <input 
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="Nhập Email người nhận..."
+                className="flex-1 bg-[#0f172a] border border-slate-700 rounded-xl px-4 py-2 outline-none focus:border-indigo-500 transition-colors"
+                onKeyDown={(e) => e.key === 'Enter' && createLink()}
+              />
+              <button 
+                onClick={createLink}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-xl font-semibold transition-all whitespace-nowrap"
+              >
+                Tạo Link
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto border border-slate-800 rounded-xl bg-black/20">
+              <table className="w-full text-left text-sm border-collapse">
+                <thead className="bg-[#0f172a] sticky top-0 border-b border-slate-800">
+                  <tr>
+                    <th className="px-4 py-3 text-slate-500 font-bold uppercase text-[10px]">Email</th>
+                    <th className="px-4 py-3 text-slate-500 font-bold uppercase text-[10px]">Ngày tạo</th>
+                    <th className="px-4 py-3 text-slate-500 font-bold uppercase text-[10px] text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {links.map((link, idx) => (
+                    <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
+                      <td className="px-4 py-3 font-medium text-slate-300">{link.email}</td>
+                      <td className="px-4 py-3 text-slate-400">
+                        {link.created_at ? new Date(link.created_at).toLocaleString('vi-VN') : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button 
+                          onClick={() => copyLink(link.short_id)}
+                          className="text-indigo-400 hover:text-indigo-300 font-semibold px-3 py-1 bg-indigo-500/10 rounded-lg transition-colors"
+                        >
+                          Copy Link Tracking
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {links.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="px-4 py-12 text-center text-slate-600 italic">Chưa có link nào được tạo</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -271,21 +418,22 @@ export default function Dashboard() {
                 <thead className="bg-[#0f172a] sticky top-0 border-b border-slate-800">
                   <tr>
                     <th className="px-4 py-3 text-slate-500 font-bold uppercase text-[10px]">Thời gian</th>
-                    <th className="px-4 py-3 text-slate-500 font-bold uppercase text-[10px]">IP Address</th>
-                    <th className="px-4 py-3 text-slate-500 font-bold uppercase text-[10px]">Thiết bị</th>
-                    <th className="px-4 py-3 text-slate-500 font-bold uppercase text-[10px]">HĐH / Trình duyệt</th>
+                    <th className="px-4 py-3 text-slate-500 font-bold uppercase text-[10px]">Email (Người mở)</th>
+                    <th className="px-4 py-3 text-slate-500 font-bold uppercase text-[10px]">Thiết bị/IP Address</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                  {logs.map((log, idx) => (
+                  {logs.map((log: any, idx) => (
                     <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="px-4 py-3 text-slate-300">
+                      <td className="px-4 py-3 text-slate-300 text-xs">
                         {log.timestamp ? new Date(log.timestamp).toLocaleString('vi-VN') : '—'}
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-indigo-300">{log.ip}</td>
-                      <td className="px-4 py-3 text-slate-400 capitalize">{log.device}</td>
+                      <td className="px-4 py-3 text-emerald-400 font-semibold text-sm">
+                        {log.email || 'Khách vãng lai'}
+                      </td>
                       <td className="px-4 py-3 text-slate-400 text-xs">
-                        {log.os} / {log.browser}
+                        <div className="font-mono text-indigo-300 mb-1">{log.ip}</div>
+                        <span className="capitalize">{log.device}</span> • {log.os} / {log.browser}
                       </td>
                     </tr>
                   ))}
@@ -304,6 +452,66 @@ export default function Dashboard() {
             >
               Đóng cửa sổ
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Modal */}
+      {modalOpen === 'delete' && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-[#1e293b] border border-slate-700 w-full max-w-md p-8 rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200">
+            <h2 className="text-2xl font-bold mb-2 text-rose-400">Xác nhận xóa</h2>
+            <p className="text-slate-400 mb-6 font-medium">Bạn có chắc chắn muốn xóa tracker <span className="text-slate-200 bg-slate-800 px-2 py-0.5 rounded italic">{activeUnit?.name}</span> không? Hành động này không thể hoàn tác.</p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setModalOpen(null)}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-semibold transition-all"
+              >
+                Hủy
+              </button>
+              <button 
+                onClick={deleteUnit}
+                className="flex-1 bg-rose-600 hover:bg-rose-700 text-white py-3 rounded-xl font-semibold transition-all shadow-lg shadow-rose-600/20"
+              >
+                Xóa ngay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {modalOpen === 'edit' && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-[#1e293b] border border-slate-700 w-full max-w-md p-8 rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200">
+            <h2 className="text-2xl font-bold mb-6 text-emerald-400">Sửa Tên Tracker</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1.5">Tên Slide mới</label>
+                <input 
+                  autoFocus
+                  type="text" 
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full bg-[#0f172a] border border-slate-700 rounded-xl px-4 py-3 outline-none focus:border-emerald-500 transition-colors"
+                />
+              </div>
+              <p className="text-xs text-slate-500 italic mt-1">* Không thể thay đổi đường Link Slides Gốc để đảm bảo toàn vẹn dữ liệu Tracking.</p>
+              <div className="flex gap-3 pt-4">
+                <button 
+                  onClick={() => setModalOpen(null)}
+                  className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-semibold transition-all"
+                >
+                  Hủy
+                </button>
+                <button 
+                  onClick={updateUnit}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-semibold transition-all shadow-lg shadow-emerald-500/20"
+                >
+                  Cập nhật
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -30,6 +30,7 @@ export async function GET() {
             units.push({
                 id,
                 name: data.name,
+                url: data.url || '',
                 total_opens: logsCount.data().count,
                 last_open,
             });
