@@ -37,6 +37,6 @@ export async function GET() {
         return NextResponse.json(units);
     } catch (err) {
         console.error('Stats fetch error:', err);
-        return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to fetch stats', details: err instanceof Error ? err.message : String(err) }, { status: 500 });
     }
 }

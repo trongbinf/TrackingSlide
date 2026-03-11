@@ -26,14 +26,33 @@ export default function Dashboard() {
   const [newName, setNewName] = useState('');
   const [toast, setToast] = useState<string | null>(null);
 
+  const [errorObj, setErrorObj] = useState<{message: string, url?: string} | null>(null);
+
   const fetchStats = async () => {
     try {
       const res = await fetch('/api/stats');
       const data = await res.json();
-      setUnits(data);
+      if (Array.isArray(data)) {
+        setUnits(data);
+        setErrorObj(null);
+      } else {
+        console.error('Error fetching stats:', data);
+        setUnits([]);
+        if (data.details?.includes('FAILED_PRECONDITION: The query requires an index')) {
+          const urlMatch = data.details.match(/(https:\/\/console\.firebase\.google\.com[^\s]+)/);
+          setErrorObj({
+            message: 'Thiếu Index trên Firebase. Vui lòng bấm vào link bên dưới để tạo (chỉ mất 1-2 phút):',
+            url: urlMatch ? urlMatch[1] : undefined
+          });
+        } else {
+          setErrorObj({ message: data.details || data.error || 'Server Error' });
+        }
+      }
       setLoading(false);
     } catch (err) {
       console.error(err);
+      setErrorObj({ message: 'Lỗi kết nối API' });
+      setLoading(false);
     }
   };
 
@@ -150,10 +169,25 @@ export default function Dashboard() {
                     </td>
                   </tr>
                 ))}
-                {units.length === 0 && !loading && (
+                {units.length === 0 && !loading && !errorObj && (
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center text-slate-500 italic">
                       Chưa có tracker nào. Hãy tạo một cái để bắt đầu!
+                    </td>
+                  </tr>
+                )}
+                {errorObj && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center">
+                      <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-6 rounded-xl inline-block text-left max-w-3xl">
+                        <p className="font-bold mb-2 text-red-400">⚠️ Không thể tải dữ liệu Firestore</p>
+                        <p className="text-sm text-red-300 mb-4">{errorObj.message}</p>
+                        {errorObj.url && (
+                          <a href={errorObj.url} target="_blank" rel="noreferrer" className="inline-block bg-white text-black px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-slate-200 transition-all shadow-lg">
+                            👉 Bấm vào đây để tạo Index tự động
+                          </a>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )}
